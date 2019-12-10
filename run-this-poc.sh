@@ -1,0 +1,1 @@
+ansible-playbook -vv --ask-vault-pass -i inventories/sandbox-cluster -u bco -l k8s-masters elasticsearch-cluster.yaml
