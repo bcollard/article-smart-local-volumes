@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-provisioner-config
+  namespace: kube-system
+data:
+  storageClassMap: |
+    {{ raw_original_map.stdout | from_yaml | indent(4, False) }}
+    {{ new_cm_chunck | indent(4, False) }}

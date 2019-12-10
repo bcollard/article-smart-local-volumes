@@ -1,0 +1,50 @@
+---
+- assert:
+    that:
+      - logical_volume is defined
+      - logical_volume.vg is defined
+      - logical_volume.lv is defined
+      - logical_volume.size is defined
+      - logical_volume.mount_point is defined
+
+- name: LVM packages should be installed
+  become: yes
+  yum:
+    name: lvm2
+    state: present
+
+- name: LV "{{ logical_volume.lv }}" should exist
+  become: yes
+  lvol:
+    vg: "{{ logical_volume.vg }}"
+    lv: "{{ logical_volume.lv }}"
+    size: "{{ logical_volume.size }}"
+    state: present
+    resizefs: yes
+  register: lv_info
+
+- name: FS should be ext4 formatted
+  become: yes
+  filesystem:
+    fstype: ext4
+    dev: "/dev/{{ logical_volume.vg }}/{{ logical_volume.lv }}"
+
+- name: Mount point should exist
+  become: yes
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+  with_items:
+    - "{{ logical_volume.mount_point }}"
+
+- name: Mount volume
+  become: yes
+  mount:
+    name: "{{ logical_volume.mount_point }}"
+    src: "/dev/{{ logical_volume.vg }}/{{ logical_volume.lv }}"
+    fstype: ext4
+    state: mounted
+  register: diskMountPointChanged
+

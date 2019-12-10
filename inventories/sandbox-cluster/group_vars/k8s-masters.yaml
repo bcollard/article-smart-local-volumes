@@ -1,0 +1,8 @@
+---
+vip: "10.125.140.229"
+
+fqdn:
+  base: "dev.r3pf.airbus.corp"
+  apim: "apim.dev.r3pf.airbus.corp"
+  api: "api.dev.r3pf.airbus.corp"
+  registry: "registry.dev.r3pf.airbus.corp"

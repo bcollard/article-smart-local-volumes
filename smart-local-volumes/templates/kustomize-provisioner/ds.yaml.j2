@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: local-volume-provisioner
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      containers:
+        - image: "quay.io/external_storage/local-volume-provisioner:v2.3.3"
+          name: provisioner
+          volumeMounts:
+            - mountPath: {{ local_storage.base_mount_point }}/{{volume.class_name }}
+              name: {{ volume.lv_name | replace('_','-') }}
+              mountPropagation: "HostToContainer"
+      volumes:
+        - name: {{ volume.lv_name | replace('_','-') }}
+          hostPath:
+            path: {{ local_storage.base_mount_point }}/{{volume.class_name }}
+

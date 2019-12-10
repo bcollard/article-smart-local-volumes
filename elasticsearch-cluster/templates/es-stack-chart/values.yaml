@@ -1,0 +1,63 @@
+
+elasticsearch:
+  enabled: true
+  cluster:
+    name: "elasticsearch"
+    env:
+      MINIMUM_MASTER_NODES: "2"
+    plugins: []
+
+  image:
+    repository: "docker.elastic.co/elasticsearch/elasticsearch-oss"
+    tag: "6.7.0"
+  client:
+    name: client
+    replicas: 2
+    heapSize: "512m"
+    # additionalJavaOpts: "-XX:MaxRAM=512m"
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1024Mi"
+      requests:
+        cpu: "25m"
+        memory: "512Mi"
+  master:
+    name: master
+    replicas: "{{ volume_elastic_master.number_of_volumes }}"
+    heapSize: "512m"
+    # additionalJavaOpts: "-XX:MaxRAM=512m"
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      name: data
+      size: "{{ volume_elastic_master.lv_size }}"
+      storageClass: "{{ volume_elastic_master.class_name }}"
+    resources:
+      limits:
+        cpu: "1"
+        memory: "1024Mi"
+      requests:
+        cpu: "25m"
+        memory: "512Mi"
+        
+  data:
+    name: data
+    exposeHttp: false
+    replicas: "{{ volume_elastic_data.number_of_volumes }}"
+    heapSize: "512m"
+    # additionalJavaOpts: "-XX:MaxRAM=512m"
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      name: data
+      size: "{{ volume_elastic_data.lv_size }}"
+      storageClass: "{{ volume_elastic_data.class_name }}"
+    resources:
+      limits:
+        cpu: "1"
+        memory: "2048Mi"
+      requests:
+        cpu: "25m"
+        memory: "1536Mi"
+

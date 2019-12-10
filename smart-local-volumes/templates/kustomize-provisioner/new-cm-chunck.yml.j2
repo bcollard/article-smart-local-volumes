@@ -1,0 +1,8 @@
+{{ volume.class_name }}:
+  hostDir: {{ local_storage.base_mount_point }}/{{volume.class_name }}
+  mountDir: {{ local_storage.base_mount_point }}/{{volume.class_name }}
+  blockCleanerCommand:
+    - "/scripts/shred.sh"
+    - "2"
+  volumeMode: Filesystem
+  fsType: ext4

@@ -1,0 +1,67 @@
+---
+
+- name: set facts
+  set_fact:
+    elastic_setup_path: "elasticsearch-cluster"
+    namespace: "r3"
+    es_stack_helm_chart_release_name: "elasticsearch-stack"
+
+- name: create r3 namespace
+  become: yes
+  ignore_errors: yes
+  run_once: true
+  shell: "kubectl create ns {{ namespace }}"
+
+
+# STORAGE
+# for each storage need, create a dedicated StorageClass, associated LV(s) (can be multiple per type), and automatic PC creation by the lcoal-storage-provisioner
+- name: "smart management of volumes"
+  become: yes
+  run_once: true
+  include_role:
+    name: smart-local-volumes
+  vars:
+    volume: "{{ item }}"
+    workers: "{{ groups['k8s-workers'] }}"
+    remote_basepath_kustomize_assets: "{{ local_storage.name }}"
+  with_items:
+    - "{{ volume_elastic_master }}"
+    - "{{ volume_elastic_data }}"
+
+
+# DEPLOY THE ELASTICSEARCH CLUSTER
+- name: "copy helm templates"
+  become: yes
+  run_once: true
+  copy:
+    src: "templates/es-stack-chart"
+    dest: "{{ elastic_setup_path }}"
+    mode: 0644
+
+- name: "enrich Helm values"
+  become: yes
+  run_once: true
+  template:
+    src: "templates/es-stack-chart/values.yaml"
+    dest: "{{ elastic_setup_path }}/es-stack-chart/values.yaml"
+
+- name: "package helm chart"
+  become: yes
+  run_once: true
+  shell: "helm dep update && helm package ."
+  args:
+    chdir: "{{elastic_setup_path }}/es-stack-chart"
+  
+- name: Include vars of Chart.yaml for later use
+  include_vars:
+    file: templates/es-stack-chart/Chart.yaml
+    name: chart
+
+- name: "package helm chart"
+  become: yes
+  run_once: true
+  shell: "helm upgrade -i {{ es_stack_helm_chart_release_name }} --namespace {{ namespace }} --timeout 60 {{ chart.name }}-{{ chart.version }}.tgz"
+  args:
+    chdir: "{{elastic_setup_path }}/es-stack-chart"
+
+

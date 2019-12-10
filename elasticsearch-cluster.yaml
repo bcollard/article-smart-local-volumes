@@ -1,0 +1,9 @@
+---
+
+- hosts: k8s-masters
+  vars_files:
+    - _vars.yaml
+
+  roles:
+    - { role: elasticsearch-cluster, tags: elastic }
+

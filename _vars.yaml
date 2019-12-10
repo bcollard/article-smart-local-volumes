@@ -1,0 +1,20 @@
+---
+
+local_storage:
+  name: "local-storage"
+  base_mount_point: "/mnt/local-storage"
+  vg_name: "rvg"
+
+volume_elastic_master:
+  class_name: "elastic-master-sc"
+  lv_size: "5G"
+  lv_name: "elastic_master"
+  pv_reclaimPolicy: Delete
+  number_of_volumes: 3
+
+volume_elastic_data:
+  class_name: "elastic-data-sc"
+  lv_size: "10G"
+  lv_name: "elastic_data"
+  pv_reclaimPolicy: Delete
+  number_of_volumes: 2

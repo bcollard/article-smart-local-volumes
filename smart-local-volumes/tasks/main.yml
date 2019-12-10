@@ -1,0 +1,143 @@
+# create SC
+# create LV(s) on Node(s)
+# Kustomize the CM & DS of the local-storage-provisioner | apply
+
+---
+- assert:
+    that:
+      - volume is defined
+      - volume.class_name is defined
+      - volume.lv_name is defined
+      - volume.lv_size is defined
+      - volume.pv_reclaimPolicy is defined
+      - volume.number_of_volumes is defined
+      - workers is defined
+      - remote_basepath_kustomize_assets is defined
+
+- name: get modulus
+  set_fact:
+    modulus: "{{ workers | length }}"
+    shuffled_workers: "{{ workers | shuffle }}"
+
+- name: Gentle debug
+  debug: 
+    msg: "{{debug_volume.key}}: {{debug_volume.value}}"
+  with_dict: "{{ volume }}"
+  loop_control:
+    loop_var: debug_volume
+
+
+# STORAGE CLASS
+- name: "create storage class manifest"
+  become: true
+  run_once: true
+  template:
+    src: storage-class.yml.j2
+    dest: "{{ remote_basepath_kustomize_assets }}/{{ volume.class_name }}.yml"
+  vars:
+    class_name: "{{ volume.class_name }}"
+
+- name: "apply storage class manifest"
+  become: true
+  run_once: true
+  command: "kubectl apply -f {{ remote_basepath_kustomize_assets }}/{{ volume.class_name }}.yml"
+  
+
+# LV
+- name: "create LV(s)"
+  become: yes
+  run_once: true
+  include_role:
+    name: lv-mgmt
+    apply: # https://github.com/ansible/ansible/issues/35398#issuecomment-451301837
+      delegate_to: "{{ shuffled_workers[worker_index | int % modulus | int] }}"
+  vars:
+    logical_volume:
+      vg: "{{ local_storage.vg_name }}"
+      lv: "{{ volume.lv_name }}{{ worker_index }}"
+      size: "{{ volume.lv_size }}"
+      mount_point: "{{ local_storage.base_mount_point }}/{{volume.class_name }}/{{ volume.lv_name }}{{ worker_index }}" 
+  delegate_facts: true
+  with_sequence: start=0 end={{ volume.number_of_volumes - 1 }}
+  loop_control:
+    loop_var: worker_index
+
+
+# update LOCAL-STORAGE-STATIC-PROVISIONER for automatic PV creation
+- name: "get current CM definition for storageClassMap"
+  become: true
+  run_once: true
+  shell: "kubectl -n kube-system get cm local-provisioner-config -o json | jq '.data.storageClassMap'"
+  register: raw_original_map
+  
+- name: "create the new storageClass item chunk"
+  set_fact:
+    new_cm_chunck: "{{ lookup('template', 'kustomize-provisioner/new-cm-chunck.yml.j2') }}"
+  when: 'volume.class_name not in raw_original_map.stdout'
+
+- name: build "configmap" patch
+  become: true
+  run_once: true
+  template:
+    src: kustomize-provisioner/config.yaml.j2
+    dest: "{{ remote_basepath_kustomize_assets }}/config.yaml"
+  when: 'volume.class_name not in raw_original_map.stdout'
+
+- name: "get current CM definition and put it into a file"
+  become: true
+  run_once: true
+  shell: "kubectl -n kube-system get cm local-provisioner-config -o yaml > previous_cm.yaml"
+  args:
+    chdir: "{{ remote_basepath_kustomize_assets }}"
+
+# wait for ds to be stable if just modified (see outer loop of this role)
+- pause:
+    seconds: 10
+
+- name: "get current DS definition an put it into a file"
+  become: true
+  run_once: true
+  shell: "kubectl -n kube-system get ds local-volume-provisioner -o yaml > previous_ds.yaml"
+  args:
+    chdir: "{{ remote_basepath_kustomize_assets }}"
+
+- name: "create daemonset patch"
+  become: true
+  run_once: true
+  template:
+    src: kustomize-provisioner/ds.yaml.j2
+    dest: "{{ remote_basepath_kustomize_assets }}/ds.yaml"
+
+- name: copy kustomization.yaml
+  become: yes
+  copy:
+    src: "kustomization.yaml"
+    dest: "{{ remote_basepath_kustomize_assets }}/kustomization.yaml"
+    mode: 0644
+
+- name: "apply kustomize patches"
+  become: true
+  run_once: true
+  shell: "kubectl kustomize . | kubectl apply -f -"
+  args:
+    chdir: "{{ remote_basepath_kustomize_assets }}"
+
+
+# HOW-TO cleanup the whole storage stack for a given app
+# - purge Helm release                                    --> helm delete --purge <release-name>
+# - list PV, if bound, stop app and delete PVC            --> k get pvc -A  -> k delete pvc
+# - (if total removal of storage class:) 
+# - edit the configMap to delete the given SC             --> ks edit cm local-provisioner-config
+# - edit the daemonSet to do so with volumes and mounts   --> ks edit ds local-volume-provisioner
+# - reload the DS / kill pods                             --> ks get po
+# - (end if)
+# - delete PV                                             --> k get pv  --> k delete pv <...>
+# - (if total removal of storage class:) 
+# - delete storageClass                                   --> k get sc  --> k delete sc <...>
+# - (end if)
+# - delete the content of the mounted dir                 --> lsblk   -->  rm -rf /mnt/local-storage/registry-sc/registry0/*
+# - umount dir                                            --> lsblk --> umount /mnt/local-storage/registry-sc/registry0
+# - delete the mounted dir                                --> rmdir ...
+# - lvremove                                              --> lvs   --> lvremove ...
+# - update fstab                                          --> vim /etc/fstab
+

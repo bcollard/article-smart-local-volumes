@@ -1,0 +1,6 @@
+resources:
+  - previous_ds.yaml
+  - previous_cm.yaml
+patches:
+  - config.yaml
+  - ds.yaml

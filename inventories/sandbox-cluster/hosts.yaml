@@ -1,0 +1,19 @@
+---
+
+all:
+  hosts:
+    node1:
+    node2:
+    node3:
+  children:
+    k8s-masters:
+      hosts:
+        node1:
+          dockerlv_size: "20G"
+    k8s-workers:
+      hosts:
+        node2:
+          dockerlv_size: "20G"
+        node3:
+          dockerlv_size: "20G"
+
