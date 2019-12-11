@@ -1,0 +1,46 @@
+---
+# https://kubernetes.io/blog/2019/04/04/kubernetes-1.14-local-persistent-volumes-ga/
+
+- name: set facts
+  set_fact:
+    local_storage_setup_path: "{{ r3pf_workspace }}/{{ local_storage.name }}"
+
+# PREPARE SERVER
+- name: create chart dir on server
+  become: yes
+  run_once: true
+  file:
+    path: "{{ local_storage_setup_path }}"
+    state: "directory"
+    mode: 0644
+
+- name: "create local discovery dir on /mnt/local-storage, on each node"
+  become: yes
+  file:
+    path: "{{ local_storage.base_mount_point }}"
+    state: directory
+  delegate_to: "{{item}}"
+  loop: "{{groups['k8s-workers']}}"
+
+# LOCAL STORAGE STATIC PROVISIONNER
+- name: "copy helm templates for static provisioner"
+  become: yes
+  copy:
+    src: "templates/manifests/provisioner/"
+    dest: "{{ local_storage_setup_path }}/"
+    mode: 0644
+
+- name: "enrich Helm values for static provisioner"
+  become: yes
+  template:
+    src: "manifests/provisioner/values.yaml"
+    dest: "{{ local_storage_setup_path }}/values.yaml"
+
+- name: "run helm install for static provisioner"
+  become: yes
+  command: "helm upgrade -i --namespace kube-system --timeout 30 -f {{ local_storage_setup_path }}/values.yaml local-storage-static-provisioner {{ local_storage_setup_path }}"
+
+# HOW to cleanup
+# first follow instructions under "HOW-TO cleanup" of the 'smart-local-volumes'
+# then,
+# - helm delete --purge local-storage-static-provisioner
