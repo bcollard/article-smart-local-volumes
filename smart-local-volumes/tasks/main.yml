@@ -14,7 +14,7 @@
       - workers is defined
       - remote_basepath_kustomize_assets is defined
 
-- name: get modulus
+- name: volume distribution vars
   set_fact:
     modulus: "{{ workers | length }}"
     shuffled_workers: "{{ workers | shuffle }}"
@@ -50,17 +50,17 @@
   include_role:
     name: lv-mgmt
     apply: # https://github.com/ansible/ansible/issues/35398#issuecomment-451301837
-      delegate_to: "{{ shuffled_workers[worker_index | int % modulus | int] }}"
+      delegate_to: "{{ shuffled_workers[loop_index | int % modulus | int] }}"
   vars:
     logical_volume:
       vg: "{{ local_storage.vg_name }}"
-      lv: "{{ volume.lv_name }}{{ worker_index }}"
+      lv: "{{ volume.lv_name }}{{ loop_index }}"
       size: "{{ volume.lv_size }}"
-      mount_point: "{{ local_storage.base_mount_point }}/{{volume.class_name }}/{{ volume.lv_name }}{{ worker_index }}" 
+      mount_point: "{{ local_storage.base_mount_point }}/{{volume.class_name }}/{{ volume.lv_name }}{{ loop_index }}" 
   delegate_facts: true
   with_sequence: start=0 end={{ volume.number_of_volumes - 1 }}
   loop_control:
-    loop_var: worker_index
+    loop_var: loop_index
 
 
 # update LOCAL-STORAGE-STATIC-PROVISIONER for automatic PV creation
