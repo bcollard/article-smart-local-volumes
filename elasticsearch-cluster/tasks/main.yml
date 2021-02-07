@@ -3,10 +3,10 @@
 - name: set facts
   set_fact:
     elastic_setup_path: "elasticsearch-cluster"
-    namespace: "r3"
+    namespace: "elastic"
     es_stack_helm_chart_release_name: "elasticsearch-stack"
 
-- name: create r3 namespace
+- name: create namespace
   become: yes
   ignore_errors: yes
   run_once: true
@@ -14,7 +14,7 @@
 
 
 # STORAGE
-# for each storage need, create a dedicated StorageClass, associated LV(s) (can be multiple per type), and automatic PC creation by the lcoal-storage-provisioner
+# for each storage need, create a dedicated StorageClass, associated LV(s) (can be multiple per type), and automatic PV creation by the local-storage-provisioner
 - name: "smart management of volumes"
   become: yes
   run_once: true
